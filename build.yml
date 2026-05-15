@@ -1,0 +1,94 @@
+name: Compilar CheatMenu SA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:   # También se puede lanzar manualmente desde GitHub
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Descargar el código del repositorio
+      - name: Obtener código
+        uses: actions/checkout@v3
+
+      # 2. Instalar Android NDK
+      - name: Instalar Android NDK r25c
+        run: |
+          wget -q https://dl.google.com/android/repository/android-ndk-r25c-linux.zip
+          unzip -q android-ndk-r25c-linux.zip
+          echo "NDK_PATH=$(pwd)/android-ndk-r25c" >> $GITHUB_ENV
+          echo "NDK instalado OK"
+
+      # 3. Descargar ImGui (fuentes necesarias para el menú)
+      - name: Descargar ImGui 1.91.9
+        run: |
+          git clone --depth 1 --branch v1.91.9-docking \
+            https://github.com/ocornut/imgui.git imgui_temp || \
+          git clone --depth 1 https://github.com/ocornut/imgui.git imgui_temp
+
+          mkdir -p imgui/backends
+          cp imgui_temp/imgui*.h       imgui/
+          cp imgui_temp/imgui*.cpp     imgui/
+          cp imgui_temp/backends/imgui_impl_opengl3.h   imgui/backends/
+          cp imgui_temp/backends/imgui_impl_opengl3.cpp imgui/backends/
+          echo "ImGui copiado OK"
+
+      # 4. Descargar headers de AML (Android Mod Loader)
+      - name: Descargar AML SDK headers
+        run: |
+          git clone --depth 1 \
+            https://github.com/RusJJ/AndroidModLoader.git aml_temp
+
+          mkdir -p sdk/aml/include/AML
+          # Copiar headers públicos
+          cp aml_temp/AML/*.h sdk/aml/include/AML/ 2>/dev/null || true
+          # Buscar en otras ubicaciones comunes
+          find aml_temp -name "*.h" -path "*/include/*" \
+            -exec cp {} sdk/aml/include/AML/ \; 2>/dev/null || true
+          find aml_temp -name "AML.h" \
+            -exec cp {} sdk/aml/include/AML/ \; 2>/dev/null || true
+
+          echo "Headers de AML copiados:"
+          ls sdk/aml/include/AML/ || echo "(vacío — revisar rutas)"
+
+      # 5. Compilar con CMake + NDK para arm64
+      - name: Compilar (arm64-v8a)
+        run: |
+          mkdir -p build
+          cmake -B build \
+            -DCMAKE_TOOLCHAIN_FILE=$NDK_PATH/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-28 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DAML_SDK_PATH=$(pwd)/sdk/aml \
+            -DIMGUI_PATH=$(pwd)/imgui
+
+          cmake --build build --config Release -- -j4
+
+      # 6. Buscar el .so resultante
+      - name: Encontrar el .so
+        run: |
+          echo "Archivos generados:"
+          find build -name "*.so" -type f
+          SO_FILE=$(find build -name "libCheatMenu.so" | head -1)
+          echo "SO_FILE=$SO_FILE" >> $GITHUB_ENV
+
+      # 7. Subir el .so como artefacto descargable
+      - name: Subir libCheatMenu.so
+        uses: actions/upload-artifact@v3
+        with:
+          name: CheatMenu-SA-v2.10-arm64
+          path: ${{ env.SO_FILE }}
+          retention-days: 30
+
+      # 8. Mostrar resultado
+      - name: Resultado
+        run: |
+          echo "================================"
+          echo " CheatMenu SA v2.10 compilado!"
+          echo " Descarga el .so desde:"
+          echo " GitHub → Actions → Este workflow → Artifacts"
+          echo "================================"
