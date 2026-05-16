@@ -23,18 +23,15 @@ public:
 
 typedef void (*AMLMainFn)(IAML* aml);
 
-#define MOD_MAIN AML_OnModMain
-
 struct AMLModInfo {
     const char* szGUID;
     const char* szName;
-    const char* szVersion;
     const char* szAuthor;
+    const char* szVersion;
     const char* szDescription;
     AMLMainFn   fnMain;
     AMLModType  eType;
 };
 
 #define AML_MOD_DEFINE static AMLModInfo __aml_modinfo =
-
-void AML_OnModMain(IAML* aml);
+#define MOD_MAIN AML_ModMain
