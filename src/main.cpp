@@ -1,8 +1,6 @@
 // ============================================================
-//  CheatMenu SA v2.10 — main.cpp v5
-//  VERSION MINIMALISTA: solo renderiza ImGui, NO toca memoria
-//  del juego hasta que el usuario presione un boton.
-//  Esto elimina crashes por offsets incorrectos.
+//  CheatMenu SA v2.10 — main.cpp v6
+//  CORREGIDO: usa GOT hook en vez de trampoline roto
 // ============================================================
 
 #include "game.h"
@@ -15,6 +13,7 @@
 #include <stdio.h>
 #include <EGL/egl.h>
 #include <GLES3/gl3.h>
+#include <elf.h>
 #include <string>
 #include <cstdio>
 #include <cstring>
@@ -30,38 +29,59 @@ static int  g_screenH     = 2400;
 // ── Hook ──────────────────────────────────────────────────────
 using fn_eglSwap = EGLBoolean(*)(EGLDisplay, EGLSurface);
 static fn_eglSwap real_eglSwapBuffers = nullptr;
-static uint8_t*   g_trampoline        = nullptr;
 
-static fn_eglSwap InstallHook(void* target, void* hookFn) {
-    g_trampoline = (uint8_t*)mmap(nullptr, 4096,
-        PROT_READ|PROT_WRITE|PROT_EXEC,
-        MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
-    if (g_trampoline == MAP_FAILED) return nullptr;
+// Busca el puntero de eglSwapBuffers dentro de libGTASA
+// y lo reemplaza por el nuestro. Sin copiar instrucciones = sin crash.
+static fn_eglSwap InstallGOTHook(uintptr_t base, void* hookFn) {
+    auto* ehdr = (Elf64_Ehdr*)base;
+    auto* phdr = (Elf64_Phdr*)(base + ehdr->e_phoff);
 
-    uintptr_t page = (uintptr_t)target & ~(uintptr_t)0xFFF;
-    mprotect((void*)page, 0x4000, PROT_READ|PROT_WRITE|PROT_EXEC);
-    memcpy(g_trampoline, target, 16);
+    uintptr_t dynOff = 0;
+    for (int i = 0; i < ehdr->e_phnum; i++)
+        if (phdr[i].p_type == PT_DYNAMIC) { dynOff = phdr[i].p_vaddr; break; }
+    if (!dynOff) { LOGE("PT_DYNAMIC no encontrado"); return nullptr; }
 
-    uintptr_t cont    = (uintptr_t)target + 16;
-    uint32_t* jmp     = (uint32_t*)(g_trampoline + 16);
-    jmp[0] = 0x58000050;
-    jmp[1] = 0xD61F0200;
-    memcpy(&jmp[2], &cont, 8);
-    __builtin___clear_cache((char*)g_trampoline, (char*)g_trampoline + 32);
+    auto*    dyn    = (Elf64_Dyn*)(base + dynOff);
+    uintptr_t symtab = 0, strtab = 0, jmprel = 0;
+    size_t    pltsz  = 0;
 
-    uint32_t hook[4];
-    hook[0] = 0x58000050;
-    hook[1] = 0xD61F0200;
-    memcpy(&hook[2], &hookFn, 8);
-    memcpy(target, hook, 16);
-    __builtin___clear_cache((char*)target, (char*)target + 16);
-    mprotect((void*)page, 0x4000, PROT_READ|PROT_EXEC);
+    for (; dyn->d_tag != DT_NULL; dyn++) {
+        switch (dyn->d_tag) {
+            case DT_SYMTAB:   symtab = base + dyn->d_un.d_ptr; break;
+            case DT_STRTAB:   strtab = base + dyn->d_un.d_ptr; break;
+            case DT_JMPREL:   jmprel = base + dyn->d_un.d_ptr; break;
+            case DT_PLTRELSZ: pltsz  = dyn->d_un.d_val;        break;
+        }
+    }
+    if (!symtab || !strtab || !jmprel) { LOGE("ELF tables no encontradas"); return nullptr; }
 
-    LOGI("Hook OK target=%p tramp=%p", target, g_trampoline);
-    return (fn_eglSwap)g_trampoline;
+    size_t count = pltsz / sizeof(Elf64_Rela);
+    auto*  rela  = (Elf64_Rela*)jmprel;
+    auto*  syms  = (Elf64_Sym*)symtab;
+
+    for (size_t i = 0; i < count; i++) {
+        uint32_t    idx  = ELF64_R_SYM(rela[i].r_info);
+        const char* name = (const char*)(strtab + syms[idx].st_name);
+
+        if (strcmp(name, "eglSwapBuffers") == 0) {
+            auto* slot    = (fn_eglSwap*)(base + rela[i].r_offset);
+            fn_eglSwap og = *slot; // guardamos el puntero original
+
+            uintptr_t page = (uintptr_t)slot & ~0xFFFULL;
+            mprotect((void*)page, 0x2000, PROT_READ|PROT_WRITE);
+            *slot = (fn_eglSwap)hookFn; // reemplazamos el puntero
+            mprotect((void*)page, 0x2000, PROT_READ);
+
+            LOGI("GOT hook OK → slot=%p original=%p", slot, og);
+            return og;
+        }
+    }
+
+    LOGE("eglSwapBuffers no encontrado en GOT");
+    return nullptr;
 }
 
-// ── Render SOLO ImGui (sin tocar memoria del juego) ───────────
+// ── Render ────────────────────────────────────────────────────
 EGLBoolean hk_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
     if (!g_imguiReady) {
         int w=0, h=0;
@@ -87,7 +107,7 @@ EGLBoolean hk_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui::NewFrame();
 
-    // Boton flotante CM
+    // Boton CM flotante
     float sz = g_screenH * 0.07f;
     ImGui::SetNextWindowPos({20, 200}, ImGuiCond_Always);
     ImGui::SetNextWindowSize({sz, sz});
@@ -99,7 +119,7 @@ EGLBoolean hk_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
         g_menuVisible = !g_menuVisible;
     ImGui::End();
 
-    // Menu principal — SOLO texto, sin tocar memoria del juego
+    // Menu principal
     if (g_menuVisible) {
         ImGui::SetNextWindowPos({100, 100}, ImGuiCond_Once);
         ImGui::SetNextWindowSize({350, 300}, ImGuiCond_Once);
@@ -142,24 +162,10 @@ static void* InitThread(void*) {
     sleep(5);
 
     g_libGTASA = GetLibBase("libGTASA.so");
+    if (!g_libGTASA) { LOGE("libGTASA no encontrada"); return nullptr; }
 
-    const char* paths[] = {
-        "libEGL.so",
-        "/system/lib64/libEGL.so",
-        "/vendor/lib64/libEGL.so",
-        nullptr
-    };
-    void* libEGL = nullptr;
-    for (int i = 0; paths[i]; i++) {
-        libEGL = dlopen(paths[i], RTLD_NOW|RTLD_GLOBAL);
-        if (libEGL) { LOGI("libEGL: %s", paths[i]); break; }
-    }
-    if (!libEGL) { LOGE("libEGL no encontrada"); return nullptr; }
-
-    void* fn = dlsym(libEGL, "eglSwapBuffers");
-    if (!fn)  { LOGE("eglSwapBuffers no encontrado"); return nullptr; }
-
-    real_eglSwapBuffers = InstallHook(fn, (void*)hk_eglSwapBuffers);
+    // Hook via GOT — sin trampoline, sin crash
+    real_eglSwapBuffers = InstallGOTHook(g_libGTASA, (void*)hk_eglSwapBuffers);
     if (real_eglSwapBuffers)
         LOGI("Hook instalado OK");
     else
