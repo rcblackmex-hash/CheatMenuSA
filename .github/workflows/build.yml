@@ -36,10 +36,19 @@ jobs:
       - name: Descargar AML headers
         run: |
           git clone --depth 1 https://github.com/RusJJ/AndroidModLoader.git aml_temp
+          echo "=== Archivos .h en el repo ==="
+          find aml_temp -name "*.h"
           mkdir -p sdk/aml/include/AML
-          find aml_temp -name "*.h" | xargs -I{} cp {} sdk/aml/include/AML/
-          echo "Headers copiados:"
-          ls sdk/aml/include/AML/
+          # Copiar manteniendo estructura de carpetas
+          if [ -d "aml_temp/include" ]; then
+            cp -r aml_temp/include/. sdk/aml/include/
+          fi
+          if [ -d "aml_temp/AML" ]; then
+            cp -r aml_temp/AML/. sdk/aml/include/AML/
+          fi
+          find aml_temp -name "*.h" -exec cp {} sdk/aml/include/AML/ \;
+          echo "=== Headers finales ==="
+          find sdk/aml/include/ -name "*.h"
 
       # 5. Compilar con CMake + NDK para arm64
       - name: Compilar (arm64-v8a)
