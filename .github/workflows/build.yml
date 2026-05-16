@@ -31,7 +31,8 @@ jobs:
           cp imgui_temp/*.cpp imgui/
           cp imgui_temp/backends/imgui_impl_opengl3.h imgui/backends/
           cp imgui_temp/backends/imgui_impl_opengl3.cpp imgui/backends/
-
+          cp imgui_temp/backends/imgui_impl_opengl3.h imgui/
+          cp imgui_temp/backends/imgui_impl_opengl3.cpp imgui/
       # 4. Descargar headers de AML (Android Mod Loader)
       - name: Crear headers AML
         run: |
