@@ -159,7 +159,7 @@ static uintptr_t GetLibBase(const char* name) {
 
 static void* InitThread(void*) {
     LOGI("InitThread start");
-    sleep(5);
+    sleep(20);
 
     g_libGTASA = GetLibBase("libGTASA.so");
     if (!g_libGTASA) { LOGE("libGTASA no encontrada"); return nullptr; }
