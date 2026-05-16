@@ -1,232 +1,254 @@
 #pragma once
 // ============================================================
-//  CheatMenu SA v2.10 — Tu mod 100% tuyo
-//  game.h — Estructuras y direcciones de GTA SA Android arm64
+//  CheatMenu SA v2.10 — game.h
+//  Offsets REALES extraídos del APK (base.apk, arm64-v8a)
+//  Librería: libGTASA.so — ELF 64-bit ARM aarch64, not stripped
 // ============================================================
 
 #include <stdint.h>
 #include <string>
-
-// ── Logging ─────────────────────────────────────────────────
 #include <android/log.h>
+
 #define LOG_TAG "CheatMenuSA"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-// ── Base del juego (se rellena en MOD_MAIN) ──────────────────
+// ── Base del juego ───────────────────────────────────────────
 inline uintptr_t g_libGTASA = 0;
 #define ADDR(offset) (g_libGTASA + (offset))
 
-// ── Offsets GTA SA v2.10 arm64-v8a ───────────────────────────
-// Si algo no funciona → busca el patrón en IDA/Ghidra y
-// actualiza el offset aquí. Todo está centralizado en este archivo.
+// ── Offsets REALES (verificados con readelf en el APK) ───────
 namespace Off {
 
-    // Punteros globales del juego
-    constexpr uintptr_t CWorld_Players      = 0x008E4A58; // CWorld::Players[0]
-    constexpr uintptr_t CGame_currArea      = 0x008E4960;
-    constexpr uintptr_t CClock_GameHours    = 0x008E4900;
-    constexpr uintptr_t CClock_GameMinutes  = 0x008E4902;
-    constexpr uintptr_t CWeather_OldWeather = 0x00C88070;
-    constexpr uintptr_t CWeather_NewWeather = 0x00C88072;
+    // ── Variables globales ────────────────────────────────────
+    // CWorld::Players (array de CPlayerInfo, tamaño 944 bytes)
+    constexpr uintptr_t CWorld_Players      = 0x00BDC738;
 
-    // Funciones del juego
-    constexpr uintptr_t GiveWeapon          = 0x004AE830; // CPed::GiveWeapon(int id, int ammo)
-    constexpr uintptr_t SetWantedLevel      = 0x004D4430; // CPlayerPed::SetWantedLevel(int)
-    constexpr uintptr_t TeleportPlayer      = 0x004E8A20; // CEntity::Teleport(float x,y,z)
-    constexpr uintptr_t CreateCar           = 0x004AA550; // CCarCtrl::CreateCarForScript(int model,float x,y,z)
-    constexpr uintptr_t SetHeading          = 0x0047C7B0; // CPlaceable::SetHeading(float)
-    constexpr uintptr_t FixCar              = 0x006A3400; // CVehicle::Fix()
-    constexpr uintptr_t FlipCar             = 0x006A3510; // CVehicle::Flip()
-    constexpr uintptr_t RequestModel        = 0x004087B0; // CStreaming::RequestModel(int,int)
-    constexpr uintptr_t LoadAllModels       = 0x00408990; // CStreaming::LoadAllRequestedModels(bool)
-    constexpr uintptr_t MarkModelAsNoLongerNeeded = 0x00408B80;
+    // CGame::currArea
+    constexpr uintptr_t CGame_currArea      = 0x00BC2418;
 
-    // Offsets DENTRO de la estructura del player (relativos al puntero del ped)
+    // CClock
+    constexpr uintptr_t CClock_GameHours    = 0x00BBBC1A; // ms_nGameClockHours   (uint8)
+    constexpr uintptr_t CClock_GameMinutes  = 0x00BBBC1B; // ms_nGameClockMinutes (uint8)
+
+    // CWeather
+    constexpr uintptr_t CWeather_OldWeather = 0x00D216F0; // OldWeatherType (int16)
+    constexpr uintptr_t CWeather_NewWeather = 0x00D216F2; // NewWeatherType (int16)
+
+    // ── Funciones del juego ───────────────────────────────────
+    // CPed::GiveWeapon(eWeaponType, uint ammo, bool)
+    constexpr uintptr_t GiveWeapon          = 0x0059525C;
+
+    // CPlayerPed::SetWantedLevel(int)
+    constexpr uintptr_t SetWantedLevel      = 0x005C76D0;
+
+    // CCarCtrl::CreateCarForScript(int model, CVector, uchar)
+    constexpr uintptr_t CreateCar           = 0x003AFA70;
+
+    // CStreaming::RequestModel(int, int)
+    constexpr uintptr_t RequestModel        = 0x003949E0;
+
+    // CStreaming::LoadAllRequestedModels(bool)
+    constexpr uintptr_t LoadAllModels       = 0x00396B28;
+
+    // CVehicle::Fix()
+    constexpr uintptr_t FixCar              = 0x0068F22C;
+
+    // ── Offsets DENTRO de estructuras ────────────────────────
+    // CPed (relativos al puntero del ped)
+    // Estos son estándar en GTA SA Android — ajustar si crashea
     constexpr uintptr_t PED_HEALTH          = 0x540;
     constexpr uintptr_t PED_ARMOR           = 0x548;
-    constexpr uintptr_t PED_MONEY           = 0x004; // dentro de PlayerInfo
-    constexpr uintptr_t PED_MATRIX_POS_X    = 0x030;
-    constexpr uintptr_t PED_MATRIX_POS_Y    = 0x034;
-    constexpr uintptr_t PED_MATRIX_POS_Z    = 0x038;
+
+    // PlayerInfo (dentro de CPlayerInfo)
+    constexpr uintptr_t PED_MONEY           = 0xB8;  // $nMoney dentro de CPlayerInfo
+
+    // CEntity::matrix (puntero a CMatrix dentro de CPlaceable)
+    constexpr uintptr_t ENTITY_MATRIX_PTR   = 0x14;  // puntero a RwMatrix*
+
+    // Posición dentro de RwMatrix (X,Y,Z de la traslación)
+    constexpr uintptr_t PED_MATRIX_POS_X    = 0x30;
+    constexpr uintptr_t PED_MATRIX_POS_Y    = 0x34;
+    constexpr uintptr_t PED_MATRIX_POS_Z    = 0x38;
+
+    // CVehicle
+    constexpr uintptr_t VEHICLE_HEALTH      = 0x4C0;
     constexpr uintptr_t VEHICLE_SPEED_X     = 0x0B4;
     constexpr uintptr_t VEHICLE_SPEED_Y     = 0x0B8;
     constexpr uintptr_t VEHICLE_SPEED_Z     = 0x0BC;
-    constexpr uintptr_t VEHICLE_HEALTH      = 0x4C0;
 }
 
-// ── Estructuras del juego ─────────────────────────────────────
+// ── Estructuras básicas ───────────────────────────────────────
+struct CVector { float x, y, z; };
 
-struct CVector {
-    float x, y, z;
+struct CMatrix {
+    float right[3];  float pad0;
+    float up[3];     float pad1;
+    float at[3];     float pad2;
+    float pos[3];    float pad3; // pos[0]=X, pos[1]=Y, pos[2]=Z
 };
 
 struct CPlayerInfo {
-    uint8_t  pad0[4];
-    int      nMoney;       // Offset 0x004
-    // ... más campos
+    uint8_t pad[0xB8];
+    int     nMoney;   // offset 0xB8
 };
 
 struct CPed {
-    uint8_t     pad0[0x18];
-    CVector*    pMatrix;        // Puntero a la matriz de posición
-    uint8_t     pad1[0x518];
-    float       fHealth;        // Offset 0x540
+    uint8_t     pad0[0x14];
+    CMatrix*    pMatrix;    // offset 0x14
+    uint8_t     pad1[0x540 - 0x14 - 8];
+    float       fHealth;    // offset 0x540
     uint8_t     pad2[4];
-    float       fArmor;         // Offset 0x548
-    // ... más campos
+    float       fArmor;     // offset 0x548
 };
 
-struct CPlayerPed : public CPed {
-    // Hereda de CPed
+struct CPlayerPed : public CPed {};
+
+struct CPlayerData {
+    CPlayerPed* pPlayerPed;  // offset 0x00
+    uint8_t     pad[0x48];
+    CPlayerInfo* pPlayerInfo; // ajustar si no funciona
 };
 
-struct CWorldPlayers {
-    CPlayerInfo*   pPlayerInfo;  // +0x00
-    CPlayerPed*    pPed;         // +0x08 (arm64, puntero 8 bytes)
-};
+// ── Acceso al jugador ─────────────────────────────────────────
+// CWorld::Players es un array de CPlayerData
+// Players[0] = jugador local
 
-// ── Getters rápidos ───────────────────────────────────────────
-
-inline CWorldPlayers* GetLocalPlayer() {
-    if (!g_libGTASA) return nullptr;
-    return reinterpret_cast<CWorldPlayers*>(ADDR(Off::CWorld_Players));
+inline CPlayerData* GetLocalPlayer() {
+    if(!g_libGTASA) return nullptr;
+    return reinterpret_cast<CPlayerData*>(ADDR(Off::CWorld_Players));
 }
 
-inline CPlayerPed* GetLocalPed() {
-    auto* p = GetLocalPlayer();
-    if (!p) return nullptr;
-    return p->pPed;
+inline CPed* GetLocalPed() {
+    auto* pl = GetLocalPlayer();
+    if(!pl) return nullptr;
+    return pl->pPlayerPed;
 }
 
-inline bool IsPlayerValid() {
-    return GetLocalPed() != nullptr;
-}
+// ── Typedef de funciones del juego ───────────────────────────
+using fn_GiveWeapon = void(*)(CPed*, int weaponId, uint32_t ammo, bool);
+using fn_SetWanted  = void(*)(CPlayerPed*, int level);
+using fn_CreateCar  = void(*)(float x, float y, float z, int model, bool);
+using fn_ReqModel   = void(*)(int model, int flags);
+using fn_LoadModels = void(*)(bool block);
+using fn_FixCar     = void(*)(void* vehicle);
 
-// ── Tipos de función del juego ────────────────────────────────
-
-using fn_GiveWeapon  = void(*)(CPed*, int weaponId, int ammo, bool);
-using fn_SetWanted   = void(*)(void*, int level);
-using fn_CreateCar   = void*(*)(int model, float x, float y, float z, bool);
-using fn_FixCar      = void(*)(void*);
-using fn_LoadModels  = void(*)(bool);
-using fn_ReqModel    = void(*)(int model, int flags);
-
-// ── IDs de clima ─────────────────────────────────────────────
-enum WeatherType : int {
-    WEATHER_EXTRASUNNY_LA  = 0,
-    WEATHER_SUNNY_LA       = 1,
-    WEATHER_CLOUDY_LA      = 2,
-    WEATHER_SUNNY_SF       = 3,
-    WEATHER_FOGGY_SF       = 7,
-    WEATHER_SUNNY_VEGAS    = 11,
-    WEATHER_THUNDER        = 16,
-    WEATHER_RAIN           = 8,
-    WEATHER_SANDSTORM      = 19,
-    WEATHER_COUNT          = 20
-};
-
-static const char* WeatherNames[] = {
-    "Extra Soleado LA", "Soleado LA", "Nublado LA",
-    "Soleado SF", "Lluvioso SF", "Nublado SF",
-    "Brumoso SF", "Brumoso SF2", "Lluvia",
-    "Lluvia pesada", "Llovizna", "Soleado Vegas",
-    "Soleado Vegas2", "Nublado Vegas", "Muy nublado",
-    "Tormenta eléctrica", "Sandy", "Sandy2",
-    "Overcast", "Tormenta de arena"
-};
-
-// ── IDs de arma ───────────────────────────────────────────────
+// ── Datos de armas ────────────────────────────────────────────
 struct WeaponEntry { int id; const char* name; };
 static const WeaponEntry Weapons[] = {
-    {1,  "Puños"}, {2, "Maza de golf"}, {3, "Nightstick"},
-    {4,  "Cuchillo"}, {5, "Bat"}, {6, "Pala"},
-    {8,  "Katana"}, {9, "Cadena"}, {22, "Pistola"},
-    {23, "Pistola silenciada"}, {24, "Desert Eagle"},
-    {25, "Escopeta"}, {26, "Escopeta recortada"},
-    {27, "SPAS-12"}, {28, "Micro-Uzi"}, {29, "MP5"},
-    {30, "AK-47"}, {31, "M4"}, {32, "Tec-9"},
-    {33, "Country Rifle"}, {34, "Sniper"}, {35, "Rocket Launcher"},
-    {36, "RPG"}, {37, "Heatseeker"}, {38, "Flamethrower"},
-    {39, "Minigun"}, {40, "Satchel Charges"}, {41, "Detonador"},
-    {42, "Spray"}, {43, "Extintor"}, {44, "Cámara"},
-    {46, "Paracaídas"}, {0, nullptr}
+    { 1,  "Brass Knuckles" }, { 2,  "Golf Club"    }, { 3,  "Nightstick" },
+    { 4,  "Knife"          }, { 5,  "Baseball Bat" }, { 6,  "Shovel"     },
+    { 7,  "Pool Cue"       }, { 8,  "Katana"       }, { 9,  "Chainsaw"   },
+    { 10, "Purple Dildo"   }, { 22, "9mm"          }, { 23, "Silenced 9mm"},
+    { 24, "Desert Eagle"   }, { 25, "Shotgun"      }, { 26, "Sawnoff SG" },
+    { 27, "Combat SG"      }, { 28, "Micro Uzi"    }, { 29, "MP5"        },
+    { 30, "AK-47"          }, { 31, "M4"           }, { 32, "Tec-9"      },
+    { 33, "Country Rifle"  }, { 34, "Sniper Rifle" }, { 35, "RPG"        },
+    { 36, "HS Rocket"      }, { 37, "Flamethrower" }, { 38, "Minigun"    },
+    { 39, "Satchel Charge" }, { 40, "Detonator"    }, { 41, "Spraycan"   },
+    { 42, "Fire Extinguish"}, { 43, "Camera"       }, { 44, "Night Vision"},
+    { 45, "Thermal Vision" }, { 46, "Parachute"    },
+    { 0, nullptr }
 };
 
-// ── Ubicaciones de teletransporte ─────────────────────────────
-struct TeleportLocation { const char* name; float x, y, z; };
-static const TeleportLocation Locations[] = {
-    // Los Santos
-    {"Grove Street",         2495.0f, -1688.0f,  13.3f},
-    {"Aeropuerto LS",        1682.0f, -2407.0f,  13.5f},
-    {"Vinewood",             1370.0f, -1325.0f,  13.4f},
-    {"Santa Maria Beach",     339.0f, -1600.0f,   7.5f},
-    {"Verdant Bluffs",       1108.0f, -1754.0f,  23.5f},
-    {"Willow Field",         2640.0f, -1982.0f,  13.5f},
-    {"Commerce",              711.0f, -1460.0f,  24.0f},
-    {"Little Mexico",         521.0f, -1302.0f,  17.0f},
-    // San Fierro
-    {"SF Downtown",         -1982.0f,   411.0f,  35.0f},
-    {"SF Aeropuerto",       -1390.0f,  -26.0f,   14.0f},
-    {"Chinatown SF",        -2183.0f,   641.0f,  35.0f},
-    {"Doherty Garage SF",   -1937.0f,   227.0f,  34.0f},
-    // Las Venturas
-    {"LV Strip",             2003.0f,  1015.0f,  10.7f},
-    {"LV Aeropuerto",        1667.0f,  1203.0f,  10.8f},
-    {"Caligula's Palace",    2228.0f,  1584.0f,  10.8f},
-    {"Four Dragons Casino",   2020.0f,  1008.0f, 10.8f},
-    // Campo
-    {"Mount Chiliad Pico",    -2186.0f, -1436.0f, 469.0f},
-    {"Tierra Robada",        -869.0f,  1374.0f,   7.2f},
-    {"Bone County",           280.0f,  1449.0f,   9.3f},
-    {"Area 69",               213.0f,  1870.0f,  17.6f},
-    {nullptr, 0, 0, 0}
-};
-
-// ── Modelos de vehículo ───────────────────────────────────────
+// ── Datos de vehículos ────────────────────────────────────────
 struct VehicleEntry { int id; const char* name; };
 static const VehicleEntry Vehicles[] = {
-    // Coches
-    {400, "Landstalker"}, {401, "Bravura"}, {402, "Buffalo"},
-    {403, "Linerunner"}, {404, "Perenniel"}, {405, "Sentinel"},
-    {409, "Stretch"}, {410, "Manana"}, {411, "Infernus"},
-    {412, "Voodoo"}, {415, "Cheetah"}, {416, "Ambulance"},
-    {418, "Moonbeam"}, {419, "Esperanto"}, {420, "Taxi"},
-    {421, "Washington"}, {422, "Bobcat"}, {426, "Premier"},
-    {429, "Banshee"}, {436, "Previon"}, {438, "Cabbie"},
-    {439, "Stallion"}, {445, "Admiral"}, {451, "Turismo"},
-    {458, "Solair"}, {466, "Supergt"}, {474, "Hermes"},
-    {475, "Sabre"}, {477, "ZR-350"}, {480, "Comet"},
-    {489, "Rancher"}, {491, "Virgo"}, {492, "Greenwood"},
-    {494, "Regina"}, {495, "Hotknife"}, {496, "Sandking"},
-    {500, "Mesa"}, {502, "Hotring Racer"}, {503, "Hotring Racer2"},
-    {516, "Nebula"}, {517, "Majestic"}, {518, "Buccaneer"},
-    {526, "Fortune"}, {527, "Cadrona"}, {533, "Feltzer"},
-    {534, "Remington"}, {535, "Slamvan"}, {536, "Blade"},
-    {540, "Vincent"}, {541, "Bullet"}, {542, "Clover"},
-    {543, "Sadler"}, {550, "Club"}, {551, "Frieght"}, // tren
-    {558, "Uranus"}, {559, "Jester"}, {560, "Sultan"},
-    {561, "Stratum"}, {562, "Elegy"}, {565, "Flash"},
-    {566, "Tahoma"}, {567, "Savanna"}, {575, "Broadway"},
-    {576, "Tornado"}, {579, "Huntley"}, {580, "Stafford"},
-    {585, "Euros"}, {587, "Phoenix"}, {589, "Club"},
-    // Motos
-    {448, "Freeway"}, {461, "PCJ-600"}, {462, "Faggio"},
-    {463, "Freeway"}, {468, "Sanchez"}, {471, "Quad"},
-    {521, "FCR-900"}, {522, "NRG-500"}, {523, "HPV1000"},
-    {581, "BF-400"}, {586, "Wayfarer"},
-    // Botes
-    {430, "Predator"}, {446, "Squalo"}, {452, "Speeder"},
-    {453, "Reefer"}, {454, "Tropic"}, {472, "Coastguard"},
-    {473, "Dinghy"}, {484, "Marquis"}, {493, "Jetmax"},
-    // Aviones/Helicópteros
-    {417, "Leviathan"}, {425, "Hunter"}, {432, "Maverick"},
-    {433, "Santoas Dumont"}, {434, "Sea Sparrow"},
-    {447, "Seasparrow"}, {460, "Skimmer"}, {469, "Sparrow"},
-    {476, "Rustler"}, {487, "Maverick"}, {488, "VCN Maverick"},
-    {497, "Police Maverick"}, {513, "Andromada"}, {519, "Shamal"},
-    {520, "Hydra"}, {524, "Nevada"}, {553, "Berkley's RC"},
-    {563, "RC Tiger"}, {577, "AT-400"}, {592, "Andromada"},
-    {593, "Dodo"},
-    {0, nullptr}
+    { 400, "Landstalker" }, { 401, "Bravura"    }, { 402, "Buffalo"   },
+    { 403, "Linerunner"  }, { 404, "Perenial"   }, { 405, "Sentinel"  },
+    { 406, "Dumper"      }, { 407, "Firetruck"  }, { 408, "Trashmaster"},
+    { 409, "Stretch"     }, { 410, "Manana"     }, { 411, "Infernus"  },
+    { 412, "Voodoo"      }, { 413, "Pony"       }, { 414, "Mule"      },
+    { 415, "Cheetah"     }, { 416, "Ambulance"  }, { 418, "Moonbeam"  },
+    { 419, "Esperanto"   }, { 420, "Taxi"       }, { 421, "Washington"},
+    { 422, "Bobcat"      }, { 423, "Mr Whoopee" }, { 424, "BF Injection"},
+    { 425, "Hunter"      }, { 426, "Premier"    }, { 427, "Enforcer"  },
+    { 428, "Securicar"   }, { 429, "Banshee"    }, { 430, "Predator"  },
+    { 431, "Bus"         }, { 432, "Rhino"      }, { 433, "Barracks OL"},
+    { 434, "Hotknife"    }, { 436, "Trailer"    }, { 437, "Previon"   },
+    { 438, "Coach"       }, { 439, "Cabbie"     }, { 440, "Stallion"  },
+    { 441, "Rumpo"       }, { 442, "RC Bandit"  }, { 443, "Romero"    },
+    { 444, "Packer"      }, { 445, "Monster"    }, { 446, "Admiral"   },
+    { 451, "Turismo"     }, { 452, "Speeder"    }, { 453, "Reefer"    },
+    { 454, "Tropic"      }, { 455, "Flatbed"    }, { 456, "Yankee"    },
+    { 457, "Caddy"       }, { 458, "Solair"     }, { 459, "Berkley RC Van"},
+    { 460, "Skimmer"     }, { 461, "PCJ-600"    }, { 462, "Faggio"    },
+    { 463, "Freeway"     }, { 464, "RC Baron"   }, { 465, "RC Raider" },
+    { 466, "Glendale"    }, { 467, "Oceanic"    }, { 468, "Sanchez"   },
+    { 469, "Sparrow"     }, { 470, "Patriot"    }, { 471, "Quad"      },
+    { 472, "Coastguard"  }, { 473, "Dinghy"     }, { 474, "Hermes"    },
+    { 475, "Sabre"       }, { 476, "Rustler"    }, { 477, "ZR-350"    },
+    { 478, "Walton"      }, { 479, "Regina"     }, { 480, "Comet"     },
+    { 481, "BMX"         }, { 482, "Burrito"    }, { 483, "Camper"    },
+    { 484, "Marquis"     }, { 485, "Baggage"    }, { 486, "Dozer"     },
+    { 487, "Maverick"    }, { 488, "News Chopper"}, { 489, "Rancher"  },
+    { 490, "FBI Rancher" }, { 491, "Virgo"      }, { 492, "Greenwood" },
+    { 494, "Hotring A"   }, { 495, "Sandy"      }, { 496, "Domestobot"},
+    { 497, "Stretch Limo"}, { 498, "Phat Quad"  }, { 499, "Club"      },
+    { 500, "Freight Train"}, {502, "Tug"        }, { 503, "Trailer 3" },
+    { 504, "Hotring B"   }, { 505, "Bloodring"  }, { 506, "Rancher 2" },
+    { 507, "Super GT"    }, { 508, "Elegant"    }, { 509, "Journey"   },
+    { 510, "Bike"        }, { 511, "Mountain Bike"}, {512, "Beagle"   },
+    { 513, "Cropduster"  }, { 514, "Stuntplane" }, { 515, "Petro Tanker"},
+    { 516, "Roadtrain"   }, { 517, "Nebula"     }, { 518, "Majestic"  },
+    { 519, "Buccaneer"   }, { 520, "Shamal"     }, { 521, "Hydra"     },
+    { 522, "FCR-900"     }, { 523, "NRG-500"    }, { 524, "HPV1000"   },
+    { 525, "Cement Truck"}, { 526, "Towtruck"   }, { 527, "Fortune"   },
+    { 528, "Cadrona"     }, { 529, "FBI Truck"  }, { 530, "Willard"   },
+    { 531, "Forklift"    }, { 532, "Tractor"    }, { 533, "Combine"   },
+    { 534, "Feltzer"     }, { 535, "Remington"  }, { 536, "Slamvan"   },
+    { 537, "Blade"       }, { 538, "Freight"    }, { 539, "Streak"    },
+    { 540, "Vortex"      }, { 541, "Vincent"    }, { 542, "Bullet"    },
+    { 543, "Clover"      }, { 544, "Sadler"     }, { 545, "Firetruck 2"},
+    { 546, "Hustler"     }, { 547, "Intruder"   }, { 548, "Primo"     },
+    { 549, "Cargobob"    }, { 550, "Tampa"      }, { 551, "Sunrise"   },
+    { 552, "Merit"       }, { 553, "Utility Van"}, { 554, "Nevada"    },
+    { 555, "Yosemite"    }, { 556, "Windsor"    }, { 557, "Monster A" },
+    { 558, "Monster B"   }, { 559, "Uranus"     }, { 560, "Jester"    },
+    { 561, "Sultan"      }, { 562, "Stratum"    }, { 563, "Elegy"     },
+    { 564, "Raindance"   }, { 565, "RC Tiger"   }, { 566, "Flash"     },
+    { 567, "Tahoma"      }, { 568, "Savanna"    }, { 569, "Bandito"   },
+    { 570, "Freight Flat"}, { 571, "Streak Carriage"}, {572,"Kart"    },
+    { 573, "Mower"       }, { 574, "Duneride"   }, { 575, "Sweeper"   },
+    { 576, "Broadway"    }, { 577, "Tornado"    }, { 578, "AT-400"    },
+    { 579, "DFT-30"      }, { 580, "Huntley"    }, { 581, "Stafford"  },
+    { 582, "BF-400"      }, { 583, "Newsvan"    }, { 584, "Tug"       },
+    { 585, "Petrotrailer"}, { 586, "Emperor"    }, { 587, "Wayfarer"  },
+    { 588, "Euros"       }, { 589, "Hotdog"     }, { 590, "Club"      },
+    { 591, "Freight Trailer"}, {592,"Streak Trailer"}, {593,"Kart 2"  },
+    { 594, "Bugged"      }, { 595, "Camper Van" }, { 596, "Dozer 2"   },
+    { 597, "RC Cam"      }, { 598, "Launch"     }, { 599, "Police LS" },
+    { 600, "Police SF"   }, { 601, "Police LV"  }, { 602, "Police Ranger"},
+    { 603, "Picador"     }, { 604, "S.W.A.T."   }, { 605, "Alpha"     },
+    { 606, "Phoenix"     }, { 607, "Glendale 2" }, { 608, "Sadler 2"  },
+    { 609, "Luggage Trailer"}, {610,"Luggage Trailer 2"}, {611,"Stair Trailer"},
+    { 612, "Boxville 2"  }, { 613, "Farm Trailer"}, {614,"Street Cleaner"},
+    { 0, nullptr }
+};
+
+// ── Datos de teletransporte ───────────────────────────────────
+struct LocationEntry { const char* name; float x, y, z; };
+static const LocationEntry Locations[] = {
+    { "Los Santos - Grove St.",   2495.0f, -1666.0f,  13.3f },
+    { "Los Santos - Centro",      1371.0f, -1270.0f,  13.4f },
+    { "Los Santos - Aeropuerto",  1686.0f,  -2437.0f, 13.6f },
+    { "San Fierro - Centro",     -1270.0f,   129.0f,  19.2f },
+    { "San Fierro - Aeropuerto", -1580.0f,  -107.0f,  14.5f },
+    { "Las Venturas - Strip",     2000.0f,  1007.0f,  10.8f },
+    { "Las Venturas - Aeropuerto",1672.0f,  1447.0f,  10.8f },
+    { "Tierra Robada",           -967.0f,  1895.0f,   5.3f  },
+    { "Bone County",              109.0f,  1244.0f,   19.6f },
+    { "Monte Chiliad",           -2178.0f,  -2427.0f, 31.0f },
+    { "Area 69",                  213.0f,   1870.0f,  17.6f },
+    { "Desierto Rojo",            632.0f,    -521.0f, 12.0f },
+    { nullptr, 0, 0, 0 }
+};
+
+// ── Nombres de clima ──────────────────────────────────────────
+static const char* WeatherNames[] = {
+    "Extra Sunny LS", "Sunny LS", "Cloudy LS", "Rainy LS",
+    "Foggy SF", "Sunny SF", "Extra Sunny LV", "Dust Storm LV",
+    "Very Cloudy LV", "Overcast", "Rainy", "Thunder",
+    "Very Cloudy", "Sunny", "Extra Sunny", "Swamp Sunset",
+    "Stormy", "Sandy", "Sandy 2", "Dark"
 };
