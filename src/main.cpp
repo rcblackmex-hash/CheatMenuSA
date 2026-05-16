@@ -1,8 +1,3 @@
-// ============================================================
-//  CheatMenu SA v2.10
-//  main.cpp v3 — Fix crash: trampoline real con mmap
-// ============================================================
-
 #include "game.h"
 #include <jni.h>
 #include <dlfcn.h>
