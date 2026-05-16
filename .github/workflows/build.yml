@@ -3,26 +3,21 @@ name: Compilar CheatMenu SA
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:   # También se puede lanzar manualmente desde GitHub
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Descargar el código del repositorio
-      - name: Obtener código
-        uses: actions/checkout@v3
+      - name: Obtener codigo
+        uses: actions/checkout@v4
 
-      # 2. Instalar Android NDK
-      - name: Instalar Android NDK r25c
+      - name: Instalar NDK r25c
         run: |
           wget -q https://dl.google.com/android/repository/android-ndk-r25c-linux.zip
           unzip -q android-ndk-r25c-linux.zip
           echo "NDK_PATH=$(pwd)/android-ndk-r25c" >> $GITHUB_ENV
-          echo "NDK instalado OK"
 
-      # 3. Descargar ImGui (fuentes necesarias para el menú)
       - name: Descargar ImGui
         run: |
           git clone --depth 1 https://github.com/ocornut/imgui.git imgui_temp
@@ -33,59 +28,74 @@ jobs:
           cp imgui_temp/backends/imgui_impl_opengl3.cpp imgui/backends/
           cp imgui_temp/backends/imgui_impl_opengl3.h imgui/
           cp imgui_temp/backends/imgui_impl_opengl3.cpp imgui/
-      # 4. Descargar headers de AML (Android Mod Loader)
+
       - name: Crear headers AML
         run: |
           mkdir -p sdk/aml/include/AML
-          cat > sdk/aml/include/AML/AML.h << 'EOF'
+          python3 << 'PYEOF'
+          import os
+          aml_h = """
           #pragma once
           #include <stdint.h>
           #include <stddef.h>
           #include <dlfcn.h>
-
-          typedef void* (*GetSym_t)(void*, const char*);
-
-          struct AMLInterface {
-              void* handle;
-              GetSym_t GetSym;
+          enum class AMLModType { Lib=0, Tool=1, Patcher=2 };
+          struct AMLModInfo {
+              const char* szGUID;
+              const char* szName;
+              const char* szVersion;
+              AMLModType eType;
+              const char* szAuthor;
+              const char* szDescription;
           };
-
-          extern AMLInterface* aml;
-
-          inline void* aml_GetSym(void* lib, const char* sym) {
-              return dlsym(lib, sym);
+          class IAML {
+          public:
+              virtual ~IAML(){}
+              virtual uintptr_t GetLib(const char* n){return 0;}
+              virtual void* GetSym(uintptr_t l, const char* s){return nullptr;}
+              virtual bool Hook(uintptr_t a, void* f, void** o){return false;}
+              virtual void PlaceB(uintptr_t a, uintptr_t d){}
+              virtual void PlaceBL(uintptr_t a, uintptr_t d){}
+              virtual void PlaceBLX(uintptr_t a, uintptr_t d){}
+              virtual void Redirect(uintptr_t a, uintptr_t d){}
+              virtual void Write(uintptr_t a, uintptr_t v, size_t s){}
+              virtual void Read(uintptr_t a, uintptr_t o, size_t s){}
+              virtual bool IsGameVersion(int v){return true;}
+              virtual uintptr_t PatternScan(const char* p, const char* m){return 0;}
+          };
+          #define AML_MOD_DEFINE static AMLModInfo __aml_modinfo =
+          """
+          arm_h = """
+          #pragma once
+          #include <stdint.h>
+          #include <sys/mman.h>
+          inline bool ARMHook(uintptr_t a, void* f, void** o){return false;}
+          inline void UnprotectMemory(uintptr_t a, size_t s=0x1000){
+              mprotect((void*)(a&~(uintptr_t)0xFFF),s+0x1000,7);
           }
-          EOF
-
-          cat > sdk/aml/include/AML/ARMHook.h << 'EOF'
+          """
+          mem_h = """
           #pragma once
           #include <stdint.h>
           #include <sys/mman.h>
           #include <string.h>
-
-          inline void ARMHook(uintptr_t addr, void* func, void** orig) {
-              // stub — AML maneja hooks en runtime
-              (void)addr; (void)func; (void)orig;
+          inline void Unprotect(uintptr_t a, size_t s=0x1000){
+              mprotect((void*)(a&~(uintptr_t)0xFFF),s+0x1000,7);
           }
-          EOF
-
-          cat > sdk/aml/include/AML/MemoryMgr.h << 'EOF'
-          #pragma once
-          #include <stdint.h>
-          #include <sys/mman.h>
-          #include <string.h>
-
-          inline void MemWrite(uintptr_t addr, void* data, size_t size) {
-              mprotect((void*)(addr & ~0xFFF), 0x1000*2, PROT_READ|PROT_WRITE|PROT_EXEC);
-              memcpy((void*)addr, data, size);
+          template<typename T>
+          inline void MemWrite(uintptr_t a, T v){
+              Unprotect(a,sizeof(T));
+              *reinterpret_cast<T*>(a)=v;
           }
-          EOF
+          template<typename T>
+          inline T MemRead(uintptr_t a){return *reinterpret_cast<T*>(a);}
+          """
+          open('sdk/aml/include/AML/AML.h','w').write(aml_h)
+          open('sdk/aml/include/AML/ARMHook.h','w').write(arm_h)
+          open('sdk/aml/include/AML/MemoryMgr.h','w').write(mem_h)
+          print('AML headers creados OK')
+          PYEOF
 
-          echo "Headers AML creados OK"
-          ls sdk/aml/include/AML/
-          
-
-      # 5. Compilar con CMake + NDK para arm64
       - name: Compilar arm64
         run: |
           mkdir -p build
@@ -99,29 +109,15 @@ jobs:
             -DCMAKE_CXX_FLAGS="-I$(pwd)"
           cmake --build build -- -j4
 
-      # 6. Buscar el .so resultante
-      - name: Encontrar el .so
+      - name: Buscar el .so
         run: |
-          echo "Archivos generados:"
           find build -name "*.so" -type f
-          SO_FILE=$(find build -name "libCheatMenu.so" | head -1)
-          echo "SO_FILE=$SO_FILE" >> $GITHUB_ENV
+          SO=$(find build -name "libCheatMenu.so" | head -1)
+          echo "SO_FILE=$SO" >> $GITHUB_ENV
 
-      # 7. Subir el .so como artefacto descargable
-      - name: Subir libCheatMenu.so
+      - name: Subir artefacto
         uses: actions/upload-artifact@v4
         with:
           name: CheatMenu-SA-v2.10-arm64
           path: ${{ env.SO_FILE }}
-          retention-days: 30
-
-      # 8. Mostrar resultado
-      - name: Resultado
-        run: |
-          echo "================================"
-          echo " CheatMenu SA v2.10 compilado!"
-          echo " Descarga el .so desde:"
-          echo " GitHub → Actions → Este workflow → Artifacts"
-          echo "================================"
-
-          
+          if-no-files-found: warn
