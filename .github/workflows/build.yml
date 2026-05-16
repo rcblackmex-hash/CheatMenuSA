@@ -32,69 +32,74 @@ jobs:
       - name: Crear headers AML
         run: |
           mkdir -p sdk/aml/include/AML
-          python3 << 'PYEOF'
-          import os
-          aml_h = """
-          #pragma once
-          #include <stdint.h>
-          #include <stddef.h>
-          #include <dlfcn.h>
-          enum class AMLModType { Lib=0, Tool=1, Patcher=2 };
-          struct AMLModInfo {
-              const char* szGUID;
-              const char* szName;
-              const char* szVersion;
-              AMLModType eType;
-              const char* szAuthor;
-              const char* szDescription;
-          };
-          class IAML {
-          public:
-              virtual ~IAML(){}
-              virtual uintptr_t GetLib(const char* n){return 0;}
-              virtual void* GetSym(uintptr_t l, const char* s){return nullptr;}
-              virtual bool Hook(uintptr_t a, void* f, void** o){return false;}
-              virtual void PlaceB(uintptr_t a, uintptr_t d){}
-              virtual void PlaceBL(uintptr_t a, uintptr_t d){}
-              virtual void PlaceBLX(uintptr_t a, uintptr_t d){}
-              virtual void Redirect(uintptr_t a, uintptr_t d){}
-              virtual void Write(uintptr_t a, uintptr_t v, size_t s){}
-              virtual void Read(uintptr_t a, uintptr_t o, size_t s){}
-              virtual bool IsGameVersion(int v){return true;}
-              virtual uintptr_t PatternScan(const char* p, const char* m){return 0;}
-          };
-          #define AML_MOD_DEFINE static AMLModInfo __aml_modinfo =
-          """
-          arm_h = """
-          #pragma once
-          #include <stdint.h>
-          #include <sys/mman.h>
-          inline bool ARMHook(uintptr_t a, void* f, void** o){return false;}
-          inline void UnprotectMemory(uintptr_t a, size_t s=0x1000){
-              mprotect((void*)(a&~(uintptr_t)0xFFF),s+0x1000,7);
-          }
-          """
-          mem_h = """
-          #pragma once
-          #include <stdint.h>
-          #include <sys/mman.h>
-          #include <string.h>
-          inline void Unprotect(uintptr_t a, size_t s=0x1000){
-              mprotect((void*)(a&~(uintptr_t)0xFFF),s+0x1000,7);
-          }
-          template<typename T>
-          inline void MemWrite(uintptr_t a, T v){
-              Unprotect(a,sizeof(T));
-              *reinterpret_cast<T*>(a)=v;
-          }
-          template<typename T>
-          inline T MemRead(uintptr_t a){return *reinterpret_cast<T*>(a);}
-          """
-          open('sdk/aml/include/AML/AML.h','w').write(aml_h)
-          open('sdk/aml/include/AML/ARMHook.h','w').write(arm_h)
-          open('sdk/aml/include/AML/MemoryMgr.h','w').write(mem_h)
-          print('AML headers creados OK')
-          PYEOF
+          cat > sdk/aml/include/AML/AML.h << 'EOF'
+#pragma once
+#include <stdint.h>
+#include <stddef.h>
+#include <dlfcn.h>
+
+enum class AMLModType { Lib=0, Tool=1, Patcher=2 };
+
+typedef void (*AMLMainFn)();
+
+struct AMLModInfo {
+    const char* szGUID;
+    const char* szName;
+    const char* szVersion;
+    const char* szAuthor;
+    const char* szDescription;
+    AMLMainFn   fnMain;
+    AMLModType  eType;
+};
+
+class IAML {
+public:
+    virtual ~IAML(){}
+    virtual uintptr_t GetLib(const char* n){ return 0; }
+    virtual void* GetSym(uintptr_t l, const char* s){ return nullptr; }
+    virtual bool Hook(uintptr_t a, void* f, void** o){ return false; }
+    virtual void PlaceB(uintptr_t a, uintptr_t d){}
+    virtual void PlaceBL(uintptr_t a, uintptr_t d){}
+    virtual void PlaceBLX(uintptr_t a, uintptr_t d){}
+    virtual void Redirect(uintptr_t a, uintptr_t d){}
+    virtual void Write(uintptr_t a, uintptr_t v, size_t s){}
+    virtual void Read(uintptr_t a, uintptr_t o, size_t s){}
+    virtual bool IsGameVersion(int v){ return true; }
+    virtual uintptr_t PatternScan(const char* p, const char* m){ return 0; }
+};
+
+#define AML_MOD_DEFINE static AMLModInfo __aml_modinfo =
+#define MOD_MAIN []()
+EOF
+
+          cat > sdk/aml/include/AML/ARMHook.h << 'EOF'
+#pragma once
+#include <stdint.h>
+#include <sys/mman.h>
+inline bool ARMHook(uintptr_t a, void* f, void** o){ return false; }
+inline void UnprotectMemory(uintptr_t a, size_t s=0x1000){
+    mprotect((void*)(a & ~(uintptr_t)0xFFF), s+0x1000, 7);
+}
+EOF
+
+          cat > sdk/aml/include/AML/MemoryMgr.h << 'EOF'
+#pragma once
+#include <stdint.h>
+#include <sys/mman.h>
+#include <string.h>
+inline void Unprotect(uintptr_t a, size_t s=0x1000){
+    mprotect((void*)(a & ~(uintptr_t)0xFFF), s+0x1000, 7);
+}
+template<typename T>
+inline void MemWrite(uintptr_t a, T v){
+    Unprotect(a, sizeof(T));
+    *reinterpret_cast<T*>(a) = v;
+}
+template<typename T>
+inline T MemRead(uintptr_t a){ return *reinterpret_cast<T*>(a); }
+EOF
+          echo "Headers AML OK"
+          ls sdk/aml/include/AML/
 
       - name: Compilar arm64
         run: |
