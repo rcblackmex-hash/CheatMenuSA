@@ -32,16 +32,16 @@ jobs:
       - name: Crear headers AML
         run: |
           mkdir -p sdk/aml/include/AML
-          cat > sdk/aml/include/AML/AML.h << 'EOF'
+          python3 - << 'PYEOF'
+          import os, base64
+
+          aml = b"""
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
 #include <dlfcn.h>
-
 enum class AMLModType { Lib=0, Tool=1, Patcher=2 };
-
 typedef void (*AMLMainFn)();
-
 struct AMLModInfo {
     const char* szGUID;
     const char* szName;
@@ -51,7 +51,6 @@ struct AMLModInfo {
     AMLMainFn   fnMain;
     AMLModType  eType;
 };
-
 class IAML {
 public:
     virtual ~IAML(){}
@@ -67,12 +66,11 @@ public:
     virtual bool IsGameVersion(int v){ return true; }
     virtual uintptr_t PatternScan(const char* p, const char* m){ return 0; }
 };
-
 #define AML_MOD_DEFINE static AMLModInfo __aml_modinfo =
 #define MOD_MAIN []()
-EOF
+"""
 
-          cat > sdk/aml/include/AML/ARMHook.h << 'EOF'
+          arm = b"""
 #pragma once
 #include <stdint.h>
 #include <sys/mman.h>
@@ -80,9 +78,9 @@ inline bool ARMHook(uintptr_t a, void* f, void** o){ return false; }
 inline void UnprotectMemory(uintptr_t a, size_t s=0x1000){
     mprotect((void*)(a & ~(uintptr_t)0xFFF), s+0x1000, 7);
 }
-EOF
+"""
 
-          cat > sdk/aml/include/AML/MemoryMgr.h << 'EOF'
+          mem = b"""
 #pragma once
 #include <stdint.h>
 #include <sys/mman.h>
@@ -97,9 +95,13 @@ inline void MemWrite(uintptr_t a, T v){
 }
 template<typename T>
 inline T MemRead(uintptr_t a){ return *reinterpret_cast<T*>(a); }
-EOF
-          echo "Headers AML OK"
-          ls sdk/aml/include/AML/
+"""
+
+          open("sdk/aml/include/AML/AML.h","wb").write(aml)
+          open("sdk/aml/include/AML/ARMHook.h","wb").write(arm)
+          open("sdk/aml/include/AML/MemoryMgr.h","wb").write(mem)
+          print("Headers AML OK")
+          PYEOF
 
       - name: Compilar arm64
         run: |
