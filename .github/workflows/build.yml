@@ -85,7 +85,7 @@ jobs:
           
 
       # 5. Compilar con CMake + NDK para arm64
-      - name: Compilar (arm64-v8a)
+      - name: Compilar arm64
         run: |
           mkdir -p build
           cmake -B build \
@@ -94,9 +94,9 @@ jobs:
             -DANDROID_PLATFORM=android-28 \
             -DCMAKE_BUILD_TYPE=Release \
             -DAML_SDK_PATH=$(pwd)/sdk/aml \
-            -DIMGUI_PATH=$(pwd)/imgui
-
-          cmake --build build --config Release -- -j4
+            -DIMGUI_PATH=$(pwd)/imgui \
+            -DCMAKE_CXX_FLAGS="-I$(pwd)"
+          cmake --build build -- -j4
 
       # 6. Buscar el .so resultante
       - name: Encontrar el .so
