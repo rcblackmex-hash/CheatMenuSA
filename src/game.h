@@ -6,8 +6,8 @@
 // ============================================================
 
 #pragma once
+#include "AML/AML.h"   // ← agregar esta línea
 #include <stdint.h>
-#include <string>
 #include <android/log.h>
 
 #define LOG_TAG "CheatMenuSA"
