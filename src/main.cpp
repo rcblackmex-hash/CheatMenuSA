@@ -20,9 +20,7 @@
 #include "imgui/imgui_impl_opengl3.h"
 #include "game.h"
 
-#define TAG "CheatMenuSA"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO,  TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
+
 
 // ── Estado global ─────────────────────────────────────────────
 static bool  g_menuVisible = false;
@@ -135,7 +133,7 @@ static void GiveAllWeapons() {
 static void SetWanted(int lv) {
     auto*pl=GetLocalPlayer();
     if(!pl||!pfn_SetWanted) return;
-    pfn_SetWanted(pl,lv);
+    pfn_SetWanted(pl->pPlayerPed, lv);  // CPlayerPed* — BIEN
     ch_wantedLevel=lv;
 }
 static void SpawnVeh(int model) {
