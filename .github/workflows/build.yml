@@ -78,7 +78,7 @@ jobs:
 
       # 7. Subir el .so como artefacto descargable
       - name: Subir libCheatMenu.so
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: CheatMenu-SA-v2.10-arm64
           path: ${{ env.SO_FILE }}
