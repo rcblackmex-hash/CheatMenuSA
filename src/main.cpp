@@ -3,6 +3,7 @@
 //  main.cpp v3 — Fix crash: trampoline real con mmap
 // ============================================================
 
+#include "game.h"
 #include <jni.h>
 #include <dlfcn.h>
 #include <unistd.h>
@@ -15,10 +16,8 @@
 #include <cstdio>
 #include <cstring>
 #include <cmath>
-
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_opengl3.h"
-#include "game.h"
 
 
 
