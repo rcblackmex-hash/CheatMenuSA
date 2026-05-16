@@ -3,21 +3,26 @@ name: Compilar CheatMenu SA
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:
+  workflow_dispatch:   # También se puede lanzar manualmente desde GitHub
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - name: Obtener codigo
-        uses: actions/checkout@v4
 
-      - name: Instalar NDK r25c
+    steps:
+      # 1. Descargar el código del repositorio
+      - name: Obtener código
+        uses: actions/checkout@v3
+
+      # 2. Instalar Android NDK
+      - name: Instalar Android NDK r25c
         run: |
           wget -q https://dl.google.com/android/repository/android-ndk-r25c-linux.zip
           unzip -q android-ndk-r25c-linux.zip
           echo "NDK_PATH=$(pwd)/android-ndk-r25c" >> $GITHUB_ENV
+          echo "NDK instalado OK"
 
+      # 3. Descargar ImGui (fuentes necesarias para el menú)
       - name: Descargar ImGui
         run: |
           git clone --depth 1 https://github.com/ocornut/imgui.git imgui_temp
@@ -27,6 +32,7 @@ jobs:
           cp imgui_temp/backends/imgui_impl_opengl3.h imgui/backends/
           cp imgui_temp/backends/imgui_impl_opengl3.cpp imgui/backends/
 
+      # 4. Descargar headers de AML (Android Mod Loader)
       - name: Descargar AML headers
         run: |
           git clone --depth 1 https://github.com/RusJJ/AndroidModLoader.git aml_temp
@@ -35,7 +41,8 @@ jobs:
           echo "Headers copiados:"
           ls sdk/aml/include/AML/
 
-      - name: Compilar arm64
+      # 5. Compilar con CMake + NDK para arm64
+      - name: Compilar (arm64-v8a)
         run: |
           mkdir -p build
           cmake -B build \
@@ -45,10 +52,32 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DAML_SDK_PATH=$(pwd)/sdk/aml \
             -DIMGUI_PATH=$(pwd)/imgui
-          cmake --build build -- -j4
 
-      - name: Subir artefacto
+          cmake --build build --config Release -- -j4
+
+      # 6. Buscar el .so resultante
+      - name: Encontrar el .so
+        run: |
+          echo "Archivos generados:"
+          find build -name "*.so" -type f
+          SO_FILE=$(find build -name "libCheatMenu.so" | head -1)
+          echo "SO_FILE=$SO_FILE" >> $GITHUB_ENV
+
+      # 7. Subir el .so como artefacto descargable
+      - name: Subir libCheatMenu.so
         uses: actions/upload-artifact@v4
         with:
           name: CheatMenu-SA-v2.10-arm64
-          path: build/libCheatMenu.so
+          path: ${{ env.SO_FILE }}
+          retention-days: 30
+
+      # 8. Mostrar resultado
+      - name: Resultado
+        run: |
+          echo "================================"
+          echo " CheatMenu SA v2.10 compilado!"
+          echo " Descarga el .so desde:"
+          echo " GitHub → Actions → Este workflow → Artifacts"
+          echo "================================"
+
+          
